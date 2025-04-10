@@ -42,3 +42,21 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"Profile for {self.user.username}"
+
+class FaceLibrary(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='registered_faces')
+    name = models.CharField(max_length=100)  # 人脸对应的人名
+    image = models.ImageField(upload_to='face_library/')  # 参考图像
+    face_encoding = models.BinaryField()  # 存储人脸特征向量（二进制格式）
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Face of {self.name} (added by {self.user.username})"
+
+class RecognizedFace(models.Model):
+    detection = models.ForeignKey(DetectedFace, on_delete=models.CASCADE, related_name='recognitions')
+    face_library = models.ForeignKey(FaceLibrary, on_delete=models.SET_NULL, null=True, related_name='recognitions')
+    similarity = models.FloatField()  # 存储相似度分数
+
+    def __str__(self):
+        return f"Recognition in {self.detection.detection} - {self.similarity:.2f} similarity"

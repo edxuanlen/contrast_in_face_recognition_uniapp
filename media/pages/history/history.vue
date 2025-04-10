@@ -26,11 +26,16 @@
             <text>暂无历史记录</text>
           </view>
 
-          <view v-else class="history-item" v-for="(item, index) in historyItems" :key="index" @click="viewDetail(item)">
-            <image :src="item.image_url" mode="aspectFill" class="history-image"></image>
-            <view class="history-info">
-              <text class="history-date">{{formatDate(item.created_at)}}</text>
-              <text class="history-count">检测到 {{item.face_count}} 个人脸</text>
+          <view v-else class="history-item" v-for="(item, index) in historyItems" :key="index">
+            <view class="item-content" @click="viewDetail(item)">
+              <image :src="item.image_url" mode="aspectFill" class="history-image"></image>
+              <view class="history-info">
+                <text class="history-date">{{formatDate(item.created_at)}}</text>
+                <text class="history-count">检测到 {{item.face_count}} 个人脸</text>
+              </view>
+            </view>
+            <view class="delete-btn" @click.stop="confirmDelete(item)">
+              <text class="delete-icon">×</text>
             </view>
           </view>
         </view>
@@ -108,6 +113,56 @@
       viewDetail(item) {
         uni.navigateTo({
           url: `/pages/detail/detail?id=${item.id}`
+        });
+      },
+
+      confirmDelete(item) {
+        uni.showModal({
+          title: '确认删除',
+          content: '确定要删除这条历史记录吗？',
+          success: (res) => {
+            if (res.confirm) {
+              this.deleteHistory(item.id);
+            }
+          }
+        });
+      },
+
+      deleteHistory(id) {
+        uni.showLoading({
+          title: '删除中...'
+        });
+
+        uni.request({
+          url: `${this.host}/api/detection_history/${id}/`,
+          method: 'DELETE',
+          header: {
+            'Authorization': 'Token ' + uni.getStorageSync('token')
+          },
+          success: (res) => {
+            uni.hideLoading();
+            if (res.data.code === 200) {
+              uni.showToast({
+                title: '删除成功',
+                icon: 'success'
+              });
+              // 从列表中移除已删除的项
+              this.historyItems = this.historyItems.filter(item => item.id !== id);
+            } else {
+              uni.showToast({
+                title: res.data.message || '删除失败',
+                icon: 'none'
+              });
+            }
+          },
+          fail: (err) => {
+            uni.hideLoading();
+            uni.showToast({
+              title: '网络错误，请重试',
+              icon: 'none'
+            });
+            console.error(err);
+          }
         });
       },
 
@@ -197,6 +252,11 @@
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
   }
 
+  .item-content {
+    display: flex;
+    flex: 1;
+  }
+
   .history-image {
     width: 100px;
     height: 100px;
@@ -217,6 +277,20 @@
 
   .history-count {
     font-size: 16px;
+    font-weight: bold;
+  }
+
+  .delete-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 50px;
+    background-color: #ff3b30;
+    color: white;
+  }
+
+  .delete-icon {
+    font-size: 24px;
     font-weight: bold;
   }
   </style>

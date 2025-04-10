@@ -67,6 +67,24 @@
 			"style": {
 				"navigationBarTitleText": "个人中心"
 			}
+		},
+		{
+			"path": "pages/face-library/index",
+			"style": {
+				"navigationBarTitleText": "人脸库管理"
+			}
+		},
+		{
+			"path": "pages/face-library/scan",
+			"style": {
+				"navigationBarTitleText": "批量扫描添加人脸"
+			}
+		},
+		{
+			"path": "pages/admin/admin",
+			"style": {
+				"navigationBarTitleText": "管理员控制台"
+			}
 		}
 	],
 	"globalStyle": {
@@ -87,6 +105,12 @@
 				"iconPath": "static/home1.png",
 				"selectedIconPath": "static/home.png",
 				"text": "首页"
+			},
+			{
+				"pagePath": "pages/history/history",
+				"iconPath": "static/ai1.png",
+				"selectedIconPath": "static/ai.png",
+				"text": "历史记录"
 			},
 			{
 				"pagePath": "pages/profile/profile",

@@ -34,6 +34,14 @@
             <text class="face-confidence">置信度: {{(face.confidence * 100).toFixed(2)}}%</text>
           </view>
 
+          <view class="face-recognition" v-if="face.recognition && face.recognition.similarity > 0.5">
+            <text class="recognition-name">识别为: {{face.recognition.name}}</text>
+            <text class="recognition-similarity">相似度: {{(face.recognition.similarity * 100).toFixed(2)}}%</text>
+          </view>
+          <view class="face-recognition" v-else>
+            <text class="recognition-unknown">未能识别</text>
+          </view>
+
           <view class="face-coords">
             <text>坐标: [{{face.bbox.join(', ')}}]</text>
           </view>
@@ -183,7 +191,11 @@ export default {
               canvas.fillRect(boxX, boxY - 30, 120, 30);
               canvas.setFillStyle('#ffffff');
               canvas.setFontSize(14);
-              canvas.fillText(`人脸 ${index+1}: ${(face.confidence * 100).toFixed(0)}%`, boxX + 5, boxY - 10);
+              let labelText = `人脸 ${index+1}`;
+              if (face.recognition && face.recognition.similarity > 0.5) {
+                labelText += `: ${face.recognition.name}`;
+              }
+              canvas.fillText(labelText, boxX + 5, boxY - 10);
             });
 
             canvas.draw();
@@ -291,6 +303,22 @@ export default {
 }
 
 .face-coords {
+  color: #666;
+}
+
+.face-recognition {
+  margin-bottom: 10px;
+}
+
+.recognition-name {
+  font-weight: bold;
+}
+
+.recognition-similarity {
+  color: #007aff;
+}
+
+.recognition-unknown {
   color: #666;
 }
 

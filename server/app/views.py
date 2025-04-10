@@ -3,7 +3,7 @@ from django.http import HttpResponse
 from django.http import JsonResponse
 from django.core.files.storage import FileSystemStorage
 from server.settings import STATICFILES_DIRS
-from app import pred
+# from app import pred
 from django.conf import settings
 import os
 from app.models import *
@@ -17,7 +17,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 import cv2
 import numpy as np
@@ -25,6 +25,10 @@ import torch
 from PIL import Image
 import platform
 from pathlib import Path
+import face_recognition
+import pickle
+import io
+from app.permissions import IsAdminUser
 
 # 在加载模型之前添加这段代码
 if platform.system() == 'Windows':
@@ -37,81 +41,6 @@ if platform.system() == 'Windows':
 model = torch.hub.load('ultralytics/yolov5', 'custom', path='app/yolov5/weights/face_detection.pt', force_reload=False)
 model.conf = 0.5  # 设置置信度阈值
 
-def class_tumor_list(request):
-    class_tumor_data = {
-                        0: '未检测到异常',
-                        1: 'Ⅰ型肿瘤',
-                        2: 'Ⅱ型肿瘤'
-                    }
-    for k, v in class_tumor_data.items():
-        class_tumor.objects.create(class_id=k, class_name=v)
-
-    return JsonResponse({'name':200})
-
-def tmour_pred(request):
-    img = request.FILES.get('file')
-    fs = FileSystemStorage(location='static/tmour')
-    fname = fs.save(img.name, img)
-    image_url,cls,boxs=pred.tmourdetect(os.path.join(STATICFILES_DIRS[2], fname))
-    # image_url,cls,boxs=pred.tmourdetect(os.path.join(STATICFILES_DIRS[0], 'result.jpg'))
-    absolute_image_url = request.build_absolute_uri(image_url)
-    # absolute_image_url = os.path.join(STATICFILES_DIRS[0], 'result.jpg'),
-    obj = class_tumor.objects.get(class_id=cls)
-    name = obj.class_name
-    print(absolute_image_url)
-    current_time = datetime.now().strftime("%Y-%m-%d %H::%M:%S")
-    ailog = data_tumor(
-        user_id = 666,
-        aitype = 2,
-        cls_type = cls, # 检测结果 0 未检测
-        cls_name = name,
-        imgpath = absolute_image_url,
-        img_bbox = boxs, # 检测框
-        result_time = current_time,
-    )
-    ailog.save()
-    return JsonResponse({'code':200,'path': absolute_image_url,'name': name})
-
-def tmourdelete(request):
-    ids = request.GET.get('id')
-    obj = data_tumor.objects.get(id=ids,delete_mask=1)
-    if obj is None: return JsonResponse({'data': '没有此数据'})
-    obj.delete_mask = 0
-    obj.save()
-    obj = data_skin.objects.filter(id=ids,delete_mask=1).exists()
-    if obj == 0 : return JsonResponse({'data': '删除成功'})
-    return JsonResponse({'data': '删除失败'})
-
-def tmour_preds(request):
-    imgs = request.FILES.getlist('file')
-    fs = FileSystemStorage(location='static/tmour')
-    urls = []
-    names = []
-    for img in imgs:
-        fname = fs.save(img.name, img)
-        image_url,cls,boxs=pred.tmourdetect(os.path.join(STATICFILES_DIRS[2], fname))
-        absolute_image_url = request.build_absolute_uri(image_url)
-        current_time = datetime.now().strftime("%Y-%m-%d %H::%M:%S")
-        obj = class_tumor.objects.get(class_id=cls)
-        name = obj.class_name
-        ailog = data_tumor(
-            user_id = 666,
-            aitype = 2,
-            cls_type = cls, # 检测结果 0 未检测
-            cls_name = name,
-            imgpath = absolute_image_url,
-            img_bbox = boxs, # 检测框
-            result_time = current_time,
-        )
-        ailog.save()
-        urls.append(absolute_image_url)
-        names.append(name)
-    return JsonResponse({'code':200,'path': urls,'name': names})
-
-def deldata(request):
-    data_skin.objects.all().delete()
-    data_tumor.objects.all().delete()
-    return JsonResponse({'code':200})
 
 def user_information(request):
     # 只处理 POST 请求
@@ -162,7 +91,7 @@ def upload_img(request):
         imgurl = f"{settings.HOSTS_DOMAIN}{settings.MEDIA_URL}/avatar/{filename}"  # 使用 MEDIA_URL
         return JsonResponse({"code": 200, "msg": "ok", "img": imgurl})
 
-        return JsonResponse({"code": 400, "msg": "无效的请求方法"})
+    return JsonResponse({"code": 400, "msg": "无效的请求方法"})
 
 def register(request):
     if request.method == "POST":
@@ -172,11 +101,21 @@ def register(request):
             password = data.get('password')
             if not phone or not password:
                 return JsonResponse({"code": 401, "message": "手机号或密码不能为空"})
-            user =User.objects.filter(phone=phone)
-            if user.exists() :
+            user = User.objects.filter(phone=phone)
+            if user.exists():
                 return JsonResponse({"code": 403, "message": "用户已存在"})
 
-            User.objects.create(phone=phone, password=password)
+            # 创建新用户
+            new_user = User.objects.create(phone=phone, password=password)
+
+            # 检查是否为第一个用户，如果是则赋予管理员权限
+            if User.objects.count() == 1:
+                # 为该用户创建UserProfile并设置is_admin为True
+                UserProfile.objects.create(user=new_user, is_admin=True)
+            else:
+                # 为普通用户创建UserProfile
+                UserProfile.objects.create(user=new_user, is_admin=False)
+
             return JsonResponse({"code": 200, "message": "添加用户成功"})
         except Exception as e:
             return JsonResponse({"code": 500, "message": "添加失败: " + str(e)})
@@ -317,6 +256,121 @@ def register_view(request):
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+def add_face_to_library(request):
+    if 'image' not in request.FILES:
+        return Response({
+            'code': 400,
+            'message': 'No image provided'
+        })
+
+    image_file = request.FILES['image']
+    name = request.POST.get('name', '')
+
+    if not name:
+        return Response({
+            'code': 400,
+            'message': 'Name is required'
+        })
+
+    # 加载图像
+    image = face_recognition.load_image_file(image_file)
+    face_locations = face_recognition.face_locations(image)
+
+    if not face_locations:
+        return Response({
+            'code': 400,
+            'message': 'No face detected in the image'
+        })
+
+    if len(face_locations) > 1:
+        return Response({
+            'code': 400,
+            'message': 'Multiple faces detected, please provide an image with a single face'
+        })
+
+    # 提取人脸特征
+    face_encoding = face_recognition.face_encodings(image, face_locations)[0]
+
+    # 将特征向量转换为二进制
+    face_encoding_binary = pickle.dumps(face_encoding)
+
+    # 保存到数据库
+    library_entry = FaceLibrary.objects.create(
+        user=request.user,
+        name=name,
+        image=image_file,
+        face_encoding=face_encoding_binary
+    )
+
+    return Response({
+        'code': 200,
+        'message': 'Face added to library successfully',
+        'id': library_entry.id
+    })
+
+@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_face_library(request):
+    # 获取用户的人脸库列表
+    faces = FaceLibrary.objects.filter(user=request.user).order_by('-created_at')
+
+    data = []
+    for face in faces:
+        data.append({
+            'id': face.id,
+            'name': face.name,
+            'image_url': request.build_absolute_uri(face.image.url),
+            'created_at': face.created_at.isoformat()
+        })
+
+    return Response({
+        'code': 200,
+        'data': data
+    })
+
+@csrf_exempt
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_face_from_library(request, pk):
+    try:
+        face = FaceLibrary.objects.get(pk=pk, user=request.user)
+    except FaceLibrary.DoesNotExist:
+        return Response({
+            'code': 404,
+            'message': 'Face not found in library'
+        })
+
+    face.delete()
+
+    return Response({
+        'code': 200,
+        'message': 'Face removed from library successfully'
+    })
+
+@csrf_exempt
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_face_library(request, face_id):
+    try:
+        face = FaceLibrary.objects.get(pk=face_id, user=request.user)
+    except FaceLibrary.DoesNotExist:
+        return Response({
+            'code': 404,
+            'message': 'Face not found in library'
+        })
+
+    face.name = request.data.get('name')
+    face.save()
+
+    return Response({
+        'code': 200,
+        'message': 'Face updated successfully'
+    })
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def detect_face(request):
     if 'image' not in request.FILES:
         return Response({
@@ -341,10 +395,68 @@ def detect_face(request):
     detections = []
     for pred in results.xyxy[0]:  # 遍历每个检测结果
         x1, y1, x2, y2, conf, cls = pred.cpu().numpy()
-        detections.append({
+
+        # 构造基本检测结果
+        detection = {
             'bbox': [float(x1), float(y1), float(x2), float(y2)],
-            'confidence': float(conf)
-        })
+            'confidence': float(conf),
+            'recognition': {
+                'name': 'Unknown',
+                'similarity': 0.0
+            }
+        }
+
+        # 如果检测置信度超过阈值，进行人脸识别
+        if float(conf) > 0.5:
+            # 从原始图像中裁剪出人脸区域
+            image = cv2.imread(img_path)
+            face_img = image[int(y1):int(y2), int(x1):int(x2)]
+
+            # 将OpenCV格式转换为face_recognition需要的格式
+            face_img_rgb = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
+
+            # 识别人脸
+            face_locations = face_recognition.face_locations(face_img_rgb)
+
+            if face_locations:
+                face_encodings = face_recognition.face_encodings(face_img_rgb, face_locations)
+
+                if face_encodings:
+                    # 获取人脸库中的所有人脸
+                    face_library = FaceLibrary.objects.all()
+
+                    best_match = {
+                        'name': 'Unknown',
+                        'similarity': 0.0,
+                        'face_id': None
+                    }
+
+                    # 与库中的人脸进行比较
+                    for lib_face in face_library:
+                        try:
+                            # 转换二进制为numpy数组
+                            lib_face_encoding = pickle.loads(lib_face.face_encoding)
+
+                            # 计算距离
+                            face_distance = face_recognition.face_distance([lib_face_encoding], face_encodings[0])[0]
+
+                            # 将距离转换为相似度
+                            similarity = 1 - face_distance
+
+                            # 如果相似度更高，更新最佳匹配
+                            if similarity > 0.5 and similarity > best_match['similarity']:
+                                best_match = {
+                                    'name': lib_face.name,
+                                    'similarity': float(similarity),
+                                    'face_id': lib_face.id
+                                }
+                        except Exception as e:
+                            print(f"Error comparing face: {str(e)}")
+                            continue
+
+                    detection['recognition'] = best_match
+
+        detections.append(detection)
 
     return Response({
         'code': 200,
@@ -382,11 +494,28 @@ def save_detection(request):
 
     # 保存每个检测到的人脸
     for result in results:
-        DetectedFace.objects.create(
+        detected_face = DetectedFace.objects.create(
             detection=detection,
             bbox=result['bbox'],
             confidence=result['confidence']
         )
+
+        # 如果有识别结果，且相似度超过0.5
+        if 'recognition' in result and result['recognition']['similarity'] > 0.5:
+            recognition = result['recognition']
+
+            try:
+                face_library = FaceLibrary.objects.get(id=recognition.get('face_id'))
+
+                # 保存识别结果
+                RecognizedFace.objects.create(
+                    detection=detected_face,
+                    face_library=face_library,
+                    similarity=recognition['similarity']
+                )
+            except FaceLibrary.DoesNotExist:
+                # 如果找不到对应的库中人脸，跳过保存识别结果
+                pass
 
     return Response({
         'code': 200,
@@ -435,15 +564,12 @@ def detection_history(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def detection_detail(request, pk):
-    # 只有管理员可以查看详情
-    if not request.user.profile.is_admin:
-        return Response({
-            'code': 403,
-            'message': 'Permission denied'
-        })
-
+    # 非管理员也可以查看自己的检测记录
     try:
-        detection = FaceDetection.objects.get(pk=pk)
+        if request.user.profile.is_admin:
+            detection = FaceDetection.objects.get(pk=pk)
+        else:
+            detection = FaceDetection.objects.get(pk=pk, user=request.user)
     except FaceDetection.DoesNotExist:
         return Response({
             'code': 404,
@@ -452,10 +578,27 @@ def detection_detail(request, pk):
 
     faces = []
     for face in detection.faces.all():
-        faces.append({
+        face_data = {
             'bbox': face.bbox,
-            'confidence': face.confidence
-        })
+            'confidence': face.confidence,
+            'recognition': {
+                'name': 'Unknown',
+                'similarity': 0.0
+            }
+        }
+
+        # 获取人脸识别结果
+        try:
+            recognized_face = face.recognitions.first()
+            if recognized_face:
+                face_data['recognition'] = {
+                    'name': recognized_face.face_library.name,
+                    'similarity': recognized_face.similarity
+                }
+        except:
+            pass
+
+        faces.append(face_data)
 
     data = {
         'id': detection.id,
@@ -470,4 +613,337 @@ def detection_detail(request, pk):
         'code': 200,
         'data': data
     })
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def scan_directory_to_library(request):
+    # 验证用户是否为管理员
+    if not request.user.profile.is_admin:
+        return Response({
+            'code': 403,
+            'message': 'Permission denied. Only admin can perform this operation.'
+        })
+
+    # 获取路径和默认名称前缀
+    directory_path = request.data.get('directory_path')
+    # directory_path = '/media/faces/'
+    name_prefix = request.data.get('name_prefix', 'Person')
+
+    if not directory_path:
+        return Response({
+            'code': 400,
+            'message': 'Directory path is required'
+        })
+
+    # 检查路径是否存在
+    if not os.path.exists(directory_path) or not os.path.isdir(directory_path):
+        return Response({
+            'code': 400,
+            'message': 'Invalid directory path'
+        })
+
+    # 定义接受的图片扩展名
+    valid_extensions = ['.jpg', '.jpeg', '.png', '.bmp']
+
+    # 收集结果统计
+    stats = {
+        'total_images': 0,
+        'processed': 0,
+        'added': 0,
+        'skipped_no_face': 0,
+        'skipped_multiple_faces': 0,
+        'skipped_existing': 0,
+        'errors': 0
+    }
+
+    # 用于检查图片是否已经存在于库中的函数
+    def is_face_in_library(face_encoding):
+        # 获取所有已有的人脸编码
+        all_faces = FaceLibrary.objects.all()
+
+        for lib_face in all_faces:
+            try:
+                # 解码库中的人脸编码
+                lib_encoding = pickle.loads(lib_face.face_encoding)
+
+                # 计算相似度
+                distance = face_recognition.face_distance([lib_encoding], face_encoding)[0]
+                similarity = 1 - distance
+
+                # 如果相似度很高，认为是同一个人脸
+                if similarity > 0.6:
+                    return True, lib_face.name
+            except:
+                continue
+
+        return False, None
+
+    # 处理结果列表
+    results = []
+
+    # 遍历目录中的所有文件
+    for filename in os.listdir(directory_path):
+        file_path = os.path.join(directory_path, filename)
+
+        # 检查是否是文件且扩展名匹配
+        if os.path.isfile(file_path) and os.path.splitext(filename)[1].lower() in valid_extensions:
+            stats['total_images'] += 1
+            result_item = {
+                'filename': filename,
+                'status': 'processed'
+            }
+
+            try:
+                # 读取图像文件
+                image = face_recognition.load_image_file(file_path)
+                face_locations = face_recognition.face_locations(image)
+
+                if not face_locations:
+                    result_item['status'] = 'skipped'
+                    result_item['reason'] = 'No face detected'
+                    stats['skipped_no_face'] += 1
+                elif len(face_locations) > 1:
+                    result_item['status'] = 'skipped'
+                    result_item['reason'] = 'Multiple faces detected'
+                    stats['skipped_multiple_faces'] += 1
+                else:
+                    # 提取人脸特征
+                    face_encoding = face_recognition.face_encodings(image, face_locations)[0]
+
+                    # 检查是否已存在于库中
+                    exists, existing_name = is_face_in_library(face_encoding)
+
+                    if exists:
+                        result_item['status'] = 'skipped'
+                        result_item['reason'] = f'Face already exists as {existing_name}'
+                        stats['skipped_existing'] += 1
+                    else:
+                        # 创建一个唯一的名称
+                        face_name = f"{name_prefix}_{stats['added'] + 1}"
+
+                        # 转换特征为二进制
+                        face_encoding_binary = pickle.dumps(face_encoding)
+
+                        # 打开文件并创建类似于InMemoryUploadedFile的文件对象
+                        with open(file_path, 'rb') as f:
+                            file_content = f.read()
+
+                        # 创建InMemoryUploadedFile对象
+                        from django.core.files.uploadedfile import InMemoryUploadedFile
+                        import io
+
+                        file_obj = InMemoryUploadedFile(
+                            io.BytesIO(file_content),
+                            'image',
+                            os.path.basename(file_path),
+                            'image/jpeg',
+                            len(file_content),
+                            None
+                        )
+
+                        # 保存到数据库
+                        FaceLibrary.objects.create(
+                            user=request.user,
+                            name=face_name,
+                            image=file_obj,
+                            face_encoding=face_encoding_binary
+                        )
+
+                        result_item['status'] = 'added'
+                        result_item['name'] = face_name
+                        stats['added'] += 1
+
+                stats['processed'] += 1
+            except Exception as e:
+                result_item['status'] = 'error'
+                result_item['reason'] = str(e)
+                stats['errors'] += 1
+
+            results.append(result_item)
+
+    return Response({
+        'code': 200,
+        'message': 'Directory scan completed',
+        'stats': stats,
+        'results': results
+    })
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_detection_history(request, pk):
+    # 只有管理员可以删除历史记录
+    if not request.user.profile.is_admin:
+        return Response({
+            'code': 403,
+            'message': 'Permission denied. Only admin can delete history records.'
+        })
+
+    try:
+        # 获取检测记录
+        detection = FaceDetection.objects.get(pk=pk)
+
+        # 删除相关联的检测到的人脸和识别结果
+        for face in detection.faces.all():
+            face.recognitions.all().delete()
+            face.delete()
+
+        # 删除检测记录本身
+        detection.delete()
+
+        return Response({
+            'code': 200,
+            'message': 'History record deleted successfully'
+        })
+    except FaceDetection.DoesNotExist:
+        return Response({
+            'code': 404,
+            'message': 'History record not found'
+        })
+    except Exception as e:
+        return Response({
+            'code': 500,
+            'message': f'Failed to delete history record: {str(e)}'
+        })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def list_users(request):
+    """获取所有用户列表"""
+    users = User.objects.all()
+    data = []
+
+    for user in users:
+        try:
+            profile = user.profile
+            is_admin = profile.is_admin
+        except UserProfile.DoesNotExist:
+            is_admin = False
+
+        data.append({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'is_admin': is_admin,
+            'date_joined': user.date_joined.isoformat(),
+            'last_login': user.last_login.isoformat() if user.last_login else None
+        })
+
+    return Response({
+        'code': 200,
+        'data': data
+    })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def toggle_admin_status(request, user_id):
+    """切换用户的管理员状态"""
+    try:
+        target_user = User.objects.get(id=user_id)
+        profile, created = UserProfile.objects.get_or_create(user=target_user)
+
+        # 切换管理员状态
+        profile.is_admin = not profile.is_admin
+        profile.save()
+
+        return Response({
+            'code': 200,
+            'message': f'Successfully {"granted" if profile.is_admin else "revoked"} admin privileges',
+            'is_admin': profile.is_admin
+        })
+    except User.DoesNotExist:
+        return Response({
+            'code': 404,
+            'message': 'User not found'
+        })
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def delete_user(request, user_id):
+    """删除用户"""
+    try:
+        user = User.objects.get(id=user_id)
+
+        # 防止删除自己
+        if user.id == request.user.id:
+            return Response({
+                'code': 400,
+                'message': 'Cannot delete your own account'
+            })
+
+        user.delete()
+        return Response({
+            'code': 200,
+            'message': 'User deleted successfully'
+        })
+    except User.DoesNotExist:
+        return Response({
+            'code': 404,
+            'message': 'User not found'
+        })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_user(request):
+    """管理员创建新用户"""
+    # 检查当前用户是否是管理员
+    try:
+        if not request.user.profile.is_admin:
+            return Response({
+                'code': 403,
+                'message': 'Permission denied. Only admin can create users.'
+            })
+    except:
+        return Response({
+            'code': 403,
+            'message': 'Permission denied.'
+        })
+
+    data = request.data
+    username = data.get('username')
+    password = data.get('password')
+    email = data.get('email')
+    is_admin = data.get('is_admin', False)
+
+    if not username or not password:
+        return Response({
+            'code': 400,
+            'message': 'Username and password are required'
+        })
+
+    if User.objects.filter(username=username).exists():
+        return Response({
+            'code': 400,
+            'message': 'Username already exists'
+        })
+
+    try:
+        # 创建用户
+        user = User.objects.create_user(
+            username=username,
+            password=password,
+            email=email
+        )
+
+        # 创建用户资料
+        UserProfile.objects.create(
+            user=user,
+            is_admin=is_admin
+        )
+
+        return Response({
+            'code': 200,
+            'message': 'User created successfully',
+            'data': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'is_admin': is_admin
+            }
+        })
+    except Exception as e:
+        return Response({
+            'code': 500,
+            'message': f'Failed to create user: {str(e)}'
+        })
 

@@ -144,7 +144,7 @@
 		justify-content: center;
 		align-items: center;
 		min-height: 100vh;
-		background-color: #f8f8f8;
+		background-color: linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
 		padding: 20px 0;
 	}
 
@@ -164,7 +164,7 @@
 	}
 
 	.input-field {
-		width: 100%;
+		width: calc(100% - 15px);
 		height: 45px;
 		border: 1px solid #ddd;
 		border-radius: 5px;

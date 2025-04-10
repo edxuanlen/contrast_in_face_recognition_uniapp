@@ -184,7 +184,11 @@ export default {
               canvas.fillRect(boxX, boxY - 30, 120, 30);
               canvas.setFillStyle('#ffffff');
               canvas.setFontSize(14);
-              canvas.fillText(`人脸 ${index+1}: ${(face.confidence * 100).toFixed(0)}%`, boxX + 5, boxY - 10);
+              let labelText = `人脸 ${index+1}`;
+              if (face.recognition && face.recognition.similarity > 0.5) {
+                labelText += `: ${face.recognition.name}`;
+              }
+              canvas.fillText(labelText, boxX + 5, boxY - 10);
             });
 
             canvas.draw();
@@ -254,6 +258,7 @@ export default {
 <style>
 .container {
   padding: 20px;
+  height: 110vh;
 }
 
 .title {
@@ -322,10 +327,11 @@ export default {
 .primary-btn {
   background-color: #007aff;
   color: white;
-  padding: 10px 20px;
+  /* padding: 10px 10px; */
   border-radius: 5px;
   margin: 10px 5px;
   flex: 1;
+  height: 60px;
 }
 
 .secondary-btn {

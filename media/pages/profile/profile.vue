@@ -15,6 +15,19 @@
         <uni-icons type="right" size="16" color="#999"></uni-icons>
       </view>
 
+      <view class="menu-item" @click="goToFaceLibrary">
+        <uni-icons type="person" size="24" color="#007aff"></uni-icons>
+        <text class="menu-text">人脸库管理</text>
+        <uni-icons type="right" size="16" color="#999"></uni-icons>
+      </view>
+
+      <view class="menu-item" @click="goToAdmin">
+        <uni-icons type="person" size="24" color="#007aff"></uni-icons>
+        <text class="menu-text">管理员管理</text>
+        <uni-icons type="right" size="16" color="#999"></uni-icons>
+      </view>
+
+
       <!-- <view class="menu-item">
         <uni-icons type="person" size="24" color="#007aff"></uni-icons>
         <text class="menu-text">个人信息</text>
@@ -57,7 +70,16 @@ export default {
         url: '/pages/history/history'
       });
     },
-
+    goToFaceLibrary() {
+      uni.navigateTo({
+        url: '/pages/face-library/index'
+      });
+    },
+    goToAdmin() {
+      uni.navigateTo({
+        url: '/pages/admin/admin'
+      });
+    },
     logout() {
       uni.showModal({
         title: '提示',

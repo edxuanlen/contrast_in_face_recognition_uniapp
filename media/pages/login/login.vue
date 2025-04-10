@@ -97,7 +97,7 @@
 		justify-content: center;
 		align-items: center;
 		height: 100vh;
-		background-color: #f8f8f8;
+		background-color: linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
 	}
 
 	.login-form {
@@ -116,13 +116,14 @@
 	}
 
 	.input-field {
-		width: 100%;
+		width: calc(100% - 15px); /* Adjusted width to account for padding */
 		height: 45px;
 		border: 1px solid #ddd;
 		border-radius: 5px;
 		margin-bottom: 15px;
 		padding: 0 15px;
 		font-size: 16px;
+		box-sizing: border-box; /* Ensures padding is included in the total width */
 	}
 
 	.login-button {
