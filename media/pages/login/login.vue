@@ -96,7 +96,7 @@
 		display: flex;
 		justify-content: center;
 		align-items: center;
-		height: 100vh;
+		height: 80vh;
 		background-color: linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
 	}
 

@@ -39,6 +39,7 @@
 		border-radius: 12px;
 		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 		margin: 15px;
+		height: 100%;
 		background: linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
 	}
 

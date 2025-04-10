@@ -66,7 +66,7 @@ export default {
   },
   methods: {
     goToHistory() {
-      uni.navigateTo({
+      uni.switchTab({
         url: '/pages/history/history'
       });
     },

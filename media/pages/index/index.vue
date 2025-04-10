@@ -258,7 +258,7 @@ export default {
 <style>
 .container {
   padding: 20px;
-  height: 110vh;
+  height: 100%;
 }
 
 .title {

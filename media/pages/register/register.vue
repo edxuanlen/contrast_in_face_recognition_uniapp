@@ -143,7 +143,7 @@
 		display: flex;
 		justify-content: center;
 		align-items: center;
-		min-height: 100vh;
+		min-height: 100%;
 		background-color: linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
 		padding: 20px 0;
 	}
