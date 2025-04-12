@@ -2,6 +2,12 @@
 
 ## how to run
 
+update env
+```
+pip install -r requirements.txt
+```
+
+
 1. data migrate
 ```
 python manage.py makemigrations
@@ -51,3 +57,24 @@ python manage.py runserver 0.0.0.0:8080
 | id | INT | - | 配置ID | 主键、非空、自增 |
 | user_id | INT | - | 关联用户 | 外键、非空 |
 | is_admin | TINYINT | 1 | 是否管理员 | 非空 |
+
+
+### 表 FaceLibrary 表
+
+| 字段名称 | 数据类型 | 长度 | 字段含义 | 约束 |
+|---------|---------|-----|---------|-----|
+| id | INT | - | 人脸库ID | 主键、非空、自增 |
+| user_id | INT | - | 关联用户 | 外键、非空 |
+| name | VARCHAR | 100 | 人脸对应人名 | 非空 |
+| image | VARCHAR | 255 | 参考图像路径 | 非空 |
+| face_encoding | BLOB | - | 人脸特征向量 | 非空 |
+| created_at | DATETIME | - | 创建时间 | 非空 |
+
+### 表 RecognizedFace 表
+
+| 字段名称 | 数据类型 | 长度 | 字段含义 | 约束 |
+|---------|---------|-----|---------|-----|
+| id | INT | - | 识别结果ID | 主键、非空、自增 |
+| detection_id | INT | - | 关联检测人脸 | 外键、非空 |
+| face_library_id | INT | - | 关联人脸库 | 外键、允许为空 |
+| similarity | FLOAT | - | 相似度分数 | 非空 |

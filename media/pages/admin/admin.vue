@@ -26,15 +26,19 @@
           />
         </view>
         <view class="cell actions">
-          <button
-            class="action-btn edit-btn"
-            @click="showEditUserModal(user)"
-          >编辑</button>
-          <button
-            class="action-btn delete-btn"
-            @click="deleteUser(user)"
-            :disabled="user.id === currentUserId"
-          >删除</button>
+          <view class="button-container">
+            <button
+              class="action-btn edit-btn"
+              @click="showEditUserModal(user)"
+              style="font-size: 12px;"
+            >编辑</button>
+            <button
+              class="action-btn delete-btn"
+              @click="deleteUser(user)"
+              :disabled="user.id === currentUserId"
+              style="font-size: 12px;"
+            >删除</button>
+          </view>
         </view>
       </view>
     </view>
@@ -502,8 +506,8 @@ export default {
   padding: 2px 6px;
   border-radius: 3px;
   font-size: 12px;
-  height: 24px;
-  line-height: 24px;
+  height: 16px;
+  line-height: 16px;
   max-width: 45px;
 }
 
@@ -600,6 +604,12 @@ export default {
     height: 40px;
     font-size: 14px;
   }
+}
+
+.button-container {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 </style>
