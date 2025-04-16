@@ -48,3 +48,8 @@ python manage.py runserver 0.0.0.0:8080
 ![人脸库管理](./docs_images/人脸库信息提交.png)
 
 ![admin账户管理](./docs_images/admin用户管理界面.png)
+
+## 需要二次开发或其他合作可以联系
+
+mail: edxuanlen@gmail.com;edxuanlen@163.com
+wechat: edxuanlen
