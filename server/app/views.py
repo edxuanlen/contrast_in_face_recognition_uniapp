@@ -857,6 +857,32 @@ def toggle_admin_status(request, user_id):
             'message': 'User not found'
         })
 
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def edit_user(request, user_id):
+    """更新用户信息"""
+    try:
+        user = User.objects.get(id=user_id)
+        data = request.data
+        user.username = data.get('username')
+        user.email = data.get('email')
+        user.password = data.get('password')
+        user.save()
+        return Response({
+            'code': 200,
+            'message': 'User updated successfully'
+        })
+    except User.DoesNotExist:
+        return Response({
+            'code': 404,
+            'message': 'User not found'
+        })
+    except Exception as e:
+        return Response({
+            'code': 500,
+            'message': f'Failed to update user: {str(e)}'
+        })
+
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated, IsAdminUser])
 def delete_user(request, user_id):

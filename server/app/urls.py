@@ -24,5 +24,6 @@ urlpatterns = [
     path('api/admin/users/create/', views.create_user, name='create_user'),
     path('api/admin/users/', views.list_users, name='list_users'),
     path('api/admin/users/<int:user_id>/toggle-admin/', views.toggle_admin_status, name='toggle_admin_status'),
+    path('api/admin/users/<int:user_id>/', views.edit_user, name='edit_user'),
     path('api/admin/users/<int:user_id>/', views.delete_user, name='delete_user'),
 ]
